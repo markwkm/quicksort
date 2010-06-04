@@ -155,7 +155,9 @@ void quicksort(int array[], int left, int right)
 						release_lock();
 						exit(0);
 					}
+
 				} else {
+                    release_lock();
 					quicksort(array, pivot_new_index + 1, right);
 					return;
 				}
