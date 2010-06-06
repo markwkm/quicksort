@@ -29,6 +29,7 @@ void get_lock()
 	operations[0].sem_op = -1;
 	operations[0].sem_flg = 0;
 	if (semop(sem_id, operations, 1) == -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("semop");
 
 		/* Detach from the shared memory now that we are done using it. */
@@ -40,7 +41,10 @@ void get_lock()
 
 		exit(1);
 	}
+/*
 	printf("[%d] dop %d\n", getpid(), *shm_degree);
+*/
+	printf(" %d", *shm_degree);
 }
 
 void release_lock()
@@ -51,6 +55,7 @@ void release_lock()
 	operations[0].sem_op = 1;
 	operations[0].sem_flg = 0;
 	if (semop(sem_id, operations, 1) == -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("semop");
 
 		/* Detach from the shared memory now that we are done using it. */
@@ -62,7 +67,10 @@ void release_lock()
 
 		exit(1);
 	}
+/*
 	printf("[%d] dop %d\n", getpid(), *shm_degree);
+*/
+	printf(" %d", *shm_degree);
 }
 
 /*
@@ -108,10 +116,9 @@ void quicksort(int array[], int left, int right)
 	 */
 	int lchild = -1;
 	int rchild = -1;
+	int status; /* For waitpid() only. */
 
 	if (right > left) {
-		int status; /* For waitpid() only. */
-
 		pivot_new_index = partition(array, left, right, pivot_index);
 
 		/*
@@ -121,56 +128,58 @@ void quicksort(int array[], int left, int right)
 
 		get_lock();
 		if (*shm_degree < max_dop) {
+			/* Under the degree limit, fork. */
 			++*shm_degree;
 			release_lock();
 
 			lchild = fork();
 			if (lchild < 0) {
+				fprintf(stderr, "[%d] ", getpid());
 				perror("fork");
 				exit(1);
 			}
 			if (lchild == 0) {
 				/* The 'left' child starts processing. */
 				quicksort(array, left, pivot_new_index - 1);
+				wait(&status);
 				get_lock();
 				--*shm_degree;
 				release_lock();
 				exit(0);
-			} else {
-				get_lock();
-				if (*shm_degree < max_dop) {
-					++*shm_degree;
-					release_lock();
-					/* The parent spawns the 'right' child. */
-					rchild = fork();
-					if (rchild < 0) {
-						perror("fork");
-						exit(1);
-					}
-					if (rchild == 0) {
-						/* The 'right' child starts processing. */
-						quicksort(array, pivot_new_index + 1, right);
-						get_lock();
-						--*shm_degree;
-						release_lock();
-						exit(0);
-					}
-
-				} else {
-                    release_lock();
-					quicksort(array, pivot_new_index + 1, right);
-					return;
-				}
 			}
-			/* Parent waits for children to finish. */
-			waitpid(lchild, &status, 0);
-			waitpid(rchild, &status, 0);
 		} else {
 			release_lock();
 			quicksort(array, left, pivot_new_index - 1);
+		}
+
+		get_lock();
+		if (*shm_degree < max_dop) {
+			/* Under the degree limit, fork. */
+			++*shm_degree;
+			release_lock();
+
+			rchild = fork();
+			if (rchild < 0) {
+				fprintf(stderr, "[%d] ", getpid());
+				perror("fork");
+				exit(1);
+			}
+			if (rchild == 0) {
+				/* The 'right' child starts processing. */
+				quicksort(array, pivot_new_index + 1, right);
+				wait(&status);
+				get_lock();
+				--*shm_degree;
+				release_lock();
+				exit(0);
+			}
+		} else {
+			release_lock();
 			quicksort(array, pivot_new_index + 1, right);
 		}
 	}
+	waitpid(lchild, &status, 0);
+	waitpid(rchild, &status, 0);
 }
 
 /*
@@ -242,12 +251,14 @@ int main(int argc, char *argv[])
 	/* Create the shared memory segment. */
 	shm_size = length * sizeof(int);
 	if ((shm_id1 = shmget(key, shm_size, IPC_CREAT | 0666)) == -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("shmget");
 		exit(1);
 	}
 
 	shm_size = sizeof(int);
 	if ((shm_id2 = shmget(key, shm_size, IPC_CREAT | 0666)) == -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("shmget");
 		exit(1);
 	}
@@ -256,17 +267,20 @@ int main(int argc, char *argv[])
 
 	argument.val = 1;
 	if (semctl(sem_id, 0, SETVAL, argument) == -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("semctl");
 		exit(1);
 	}
 
 	/* Attached to the shared memory segment in order to use it. */
 	if ((shm_array = shmat(shm_id1, NULL, 0)) == (int *) -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("shmat");
 		exit(1);
 	}
 
 	if ((shm_degree = shmat(shm_id2, NULL, 0)) == (int *) -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("shmat");
 		exit(1);
 	}
@@ -280,35 +294,41 @@ int main(int argc, char *argv[])
 	}
 	display(shm_array, length);
 
-	printf("now sorting...\n");
+	printf("[%d] now sorting...\n", getpid());
+	printf("Watch the count of forks...\n");
 	quicksort(shm_array, 0, length - 1);
-	printf("done sorting\n");
+	printf("\n[%d] done sorting\n", getpid());
 
 	display(shm_array, length);
 
 	/* Detach from the shared memory now that we are done using it. */
 	if (shmdt(shm_array) == -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("shmdt");
 		exit(1);
 	}
 
 	if (shmdt(shm_degree) == -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("shmdt");
 		exit(1);
 	}
 
 	/* Delete the shared memory segment. */
 	if (shmctl(shm_id1, IPC_RMID, NULL) == -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("shmctl");
 		exit(1);
 	}
 
 	if (shmctl(shm_id2, IPC_RMID, NULL) == -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("shmctl");
 		exit(1);
 	}
 
 	if (semctl(sem_id, 0, IPC_RMID) == -1) {
+		fprintf(stderr, "[%d] ", getpid());
 		perror("semctl");
 		exit(1);
 	}
