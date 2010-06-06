@@ -1,0 +1,13 @@
+quicksort.c
+
+Single threaded implementation of quicksort.
+
+quicksort-parallel.c
+
+Processed based impelmentation of quicksort, using processes.  Implemented
+like a fork bomb.
+
+quicksort-pool.c
+
+Processed based impelmentation of quicksort, using processes.  Implemented
+limiting the degree of parallelism.
