@@ -141,7 +141,6 @@ void quicksort(int array[], int left, int right)
 			if (lchild == 0) {
 				/* The 'left' child starts processing. */
 				quicksort(array, left, pivot_new_index - 1);
-				wait(&status);
 				get_lock();
 				--*shm_degree;
 				release_lock();
@@ -167,7 +166,6 @@ void quicksort(int array[], int left, int right)
 			if (rchild == 0) {
 				/* The 'right' child starts processing. */
 				quicksort(array, pivot_new_index + 1, right);
-				wait(&status);
 				get_lock();
 				--*shm_degree;
 				release_lock();
