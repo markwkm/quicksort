@@ -36,7 +36,9 @@ void quicksort(int array[], int left, int right)
 	int pivot_index = left;
 	int pivot_new_index;
 
+	/*
 	printf("sorting %d to %d\n", left, right);
+	*/
 	if (right > left) {
 		pivot_new_index = partition(array, left, right, pivot_index);
 		quicksort(array, left, pivot_new_index - 1);
@@ -77,7 +79,9 @@ int main(int argc, char *argv[])
 		++length;
 		array = (int *) realloc(array, length * sizeof(int));
 		array[length - 1] = data;
+		/*
 		display(array, length);
+		*/
 	}
 	fclose(fh);
 	printf("%d elements read\n", length);
