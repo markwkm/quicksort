@@ -4,10 +4,10 @@ Single threaded recursive implementation of quicksort.
 
 quicksort-parallel.c
 
-Processed based recursive impelmentation of quicksort, using processes.
-Implemented like a fork bomb.
+Processed based recursive impelmentation of quicksort.  Implemented like a fork
+bomb.
 
 quicksort-pool.c
 
-Processed based recursive impelmentation of quicksort, using processes.
-Implemented limiting the degree of parallelism.
+Processed based recursive impelmentation of quicksort.  Ability to limit the
+degree of parallelism.
